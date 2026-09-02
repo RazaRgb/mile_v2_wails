@@ -1,0 +1,66 @@
+name: Build Android APK
+on:
+  push:
+    branches: [build_android]
+  workflow_dispatch:
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    environment: build_android
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Fix apt mirrors + update
+        run: |
+          sudo sed -i 's|azure.archive.ubuntu.com|archive.ubuntu.com|g' \
+            /etc/apt/sources.list /etc/apt/sources.list.d/*.sources 2>/dev/null || true
+          sudo apt-get update -o Acquire::Retries=3 -o Acquire::http::Timeout=10
+          sudo apt-get install -y libgtk-4-dev libwebkitgtk-6.0-dev
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+          cache: true
+          
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          
+      - name: Install Task and Wails
+        run: |
+          go install github.com/go-task/task/v3/cmd/task@latest
+          go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-alpha2.106
+          
+      - name: Setup Frontend Env
+        run: |
+          mkdir -p frontend
+          # Backend base URL — set as a Variable (not a Secret) in
+          # Settings → Environments → build_android. Must include https://
+          echo "VITE_API_URL=${{ vars.VITE_API_URL }}" > frontend/.env.production
+          
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        
+      - name: Install pinned Android NDK
+        run: |
+          sdkmanager --install "ndk;26.3.11579264"
+          echo "ANDROID_NDK_HOME=$ANDROID_SDK_ROOT/ndk/26.3.11579264" >> "$GITHUB_ENV"
+          echo "ANDROID_HOME=$ANDROID_SDK_ROOT" >> "$GITHUB_ENV"
+          
+      - name: Wails doctor
+        run: wails3 doctor
+        
+      - name: Build Android APK
+        # android:build = frontend + overlay + Go→.so (NDK); then assemble the APK.
+        # ARCH=arm64 targets physical phones (x86_64 would be emulator-only).
+        run: task android:build android:assemble:apk ARCH=arm64
+        
+      - uses: actions/upload-artifact@v4
+        with:
+          name: app-release-apk
+          path: "build/android/**/*.apk"

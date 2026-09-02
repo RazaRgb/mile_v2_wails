@@ -1,0 +1,131 @@
+@import "tailwindcss";
+html,
+body {
+  height: 100%;
+  margin: 0;
+  /* slate-950: fill any area the app doesn't paint (status/nav bar gaps) */
+  background-color: var(--bg-color);
+}
+
+#root {
+  height: 100%;
+}
+
+:root{
+  --grad1: rgba(100, 100, 180, 0.2);
+  --grad2: rgba(240, 200, 10, 0.2);
+  --grad3: rgba(100, 50, 15, 0.35);
+  --grad4: rgba(120, 110, 150, 0);
+  --grad5: rgba(0,0,0,1);
+
+  --bg-color : rgb(0, 0, 0);
+}
+
+/* Reel feed: snap the window to each full-screen reel. */
+html {
+  scroll-snap-type: y mandatory;
+}
+
+.feed-container {
+  padding: 0q;
+  background-color: var(--bg-color);
+}
+
+.reel-topic {
+  font-size: 2em;
+  font-weight:600;
+  color: #d5d2d0;
+  font-family: merriweather;
+  padding: 0q;
+  
+}
+
+.reel-container {
+  background-color: #191510;
+}
+
+.reel-container {
+  /* 1. The 3-color translucent gradient (using low-opacity RGBA) */
+  background: 
+    linear-gradient(
+      135deg,
+      var(--grad1) 0%, 
+      var(--grad2) 50%, 
+      var(--grad3) 100%
+    ), 0%, transparent
+    linear-gradient(
+      var(--grad4) 0%, 
+      var(--grad5) 200%
+    );
+  background-blend-mode:color; 
+    
+}
+
+
+
+
+/* Markdown content styling inside a reel. */
+.prose-reel h1 {
+
+  font-family: merriweather;
+  font-size: 0.5rem;
+  font-weight: 700;
+  color: #f1f5f9;
+  margin: 1rem 0 0.5rem;
+}
+.prose-reel h2 {
+  font-family: merriweather;
+  font-size: 0.5rem;
+  font-weight: 600;
+  margin: 0.9rem 0 0.4rem;
+}
+.prose-reel p {
+  font-family: merriweather;
+  margin: 0.5rem 0;
+  font-size: 1em;
+}
+.prose-reel ul,
+.prose-reel ol {
+  margin: 0.5rem 0;
+  padding-left: 1.25rem;
+}
+.prose-reel ul {
+  list-style: disc;
+}
+.prose-reel ol {
+  list-style: decimal;
+}
+.prose-reel strong {
+  color: #f8fafc;
+  font-weight: 600;
+}
+.prose-reel hr {
+  border-color: #334155;
+  margin: 1rem 0;
+}
+.prose-reel pre {
+  background: #0f172a;
+  border: 1px solid #334155;
+  border-radius: 0.5rem;
+  padding: 0.75rem;
+  overflow-x: auto;
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+.prose-reel code {
+  background: #1e293b;
+  padding: 0.1em 0.3em;
+  border-radius: 0.25rem;
+  font-size: 0.85em;
+}
+.prose-reel pre code {
+  background: none;
+  padding: 0;
+  font-size: inherit;
+}
+
+
+/* KaTeX math — match the reel text size. */
+.prose-reel .katex {
+  font-size: 1.05em;
+}

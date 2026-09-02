@@ -1,0 +1,13 @@
+[Desktop Entry]
+Version=1.0
+Name=My Product
+Comment=A mile application
+# The Exec line includes %u to pass the URL to the application
+Exec=/usr/local/bin/mile %u
+Terminal=false
+Type=Application
+Icon=mile
+Categories=Utility;
+StartupWMClass=mile
+
+ 
