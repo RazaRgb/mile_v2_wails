@@ -13,8 +13,6 @@ interface TreeNodeItem extends TreeNode {
   depth: number
 }
 
-// Builds the nested tree from flat nodes (paths are zero-padded, so sorting by
-// path gives parents before children).
 function buildTree(nodes: TreeNode[]): TreeNodeItem[] {
   const sorted = [...nodes].sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0))
   const byPath = new Map<string, TreeNodeItem>()
@@ -37,22 +35,20 @@ function buildTree(nodes: TreeNode[]): TreeNodeItem[] {
   return roots
 }
 
-// Marker for a leaf node; branches get none.
 function nodeMarker(n: TreeNodeItem): { symbol: string; className: string } {
   if (!n.is_leaf) return { symbol: '', className: '' }
   switch (n.status) {
     case 'watched':
-      return { symbol: '●', className: 'text-green-400' }
+      return { symbol: '●', className: 'watched' }
     case 'skipped':
-      return { symbol: '◐', className: 'text-amber-400' }
+      return { symbol: '◐', className: 'skipped' }
     case 'unwatched':
-      return { symbol: '○', className: 'text-slate-400' }
+      return { symbol: '○', className: 'unwatched' }
     default:
-      return { symbol: '·', className: 'text-slate-600' }
+      return { symbol: '·', className: 'not-started' }
   }
 }
 
-// All paths at depth >= 2 (default-collapsed), for the "collapse all" reset.
 function allCollapsible(items: TreeNodeItem[]): string[] {
   const out: string[] = []
   const walk = (list: TreeNodeItem[]) => {
@@ -75,7 +71,6 @@ export default function ProgressView({ stream, token, onClose }: ProgressViewPro
       .streamTree(stream.id, token)
       .then((tree) => {
         setNodes(tree)
-        // Default: roots and their children visible, deeper branches collapsed.
         setCollapsed(new Set(allCollapsible(buildTree(tree))))
       })
       .catch((err) => setError(err instanceof Error ? err.message : 'Failed to load tree'))
@@ -125,18 +120,18 @@ export default function ProgressView({ stream, token, onClose }: ProgressViewPro
         <div key={it.node_id}>
           <button
             onClick={() => it.children.length > 0 && toggle(it.path)}
-            className="flex w-full items-center gap-1.5 py-0.5 text-left"
+            className="progress-tree-node"
           >
-            <span className="whitespace-pre font-mono text-slate-600">{connector}</span>
+            <span className="progress-tree-connector">{connector}</span>
             {it.children.length > 0 && (
-              <span className="w-3 shrink-0 text-xs text-slate-500">{isCollapsed ? '▸' : '▾'}</span>
+              <span className="progress-tree-toggle">{isCollapsed ? '▸' : '▾'}</span>
             )}
             <span
-              className={`truncate text-sm ${it.children.length === 0 ? 'text-slate-300' : 'font-semibold text-slate-200'}`}
+              className={`progress-tree-label ${it.children.length > 0 ? 'branch' : ''}`}
             >
               {it.topic}
             </span>
-            <span className={`ml-auto shrink-0 text-sm ${marker.className}`}>{marker.symbol}</span>
+            <span className={`progress-tree-marker ${marker.className}`}>{marker.symbol}</span>
           </button>
           {!isCollapsed && renderTree(it.children, childPrefix)}
         </div>
@@ -145,65 +140,55 @@ export default function ProgressView({ stream, token, onClose }: ProgressViewPro
   }
 
   return (
-    <div className="fixed inset-0 z-40 flex flex-col bg-slate-950">
-      {/* Header */}
-      <div className="flex items-center justify-between gap-3 border-b border-slate-800 px-4 py-3">
-        <div className="min-w-0">
-          <h2 className="truncate text-base font-bold text-white">{stream.topic}</h2>
-          <p className="text-xs text-slate-400">
-            <span className="text-green-400">{counts.watched} watched</span>
+    <div className="progress-overlay">
+      <div className="progress-header">
+        <div className="progress-header-info">
+          <h2 className="progress-title">{stream.topic}</h2>
+          <p className="progress-stats">
+            <span className="watched">{counts.watched} watched</span>
             {' · '}
-            <span className="text-amber-400">{counts.skipped} skipped</span>
+            <span className="skipped">{counts.skipped} skipped</span>
             {' · '}
-            <span className="text-slate-300">{counts.unwatched + counts.notStarted} to go</span>
+            <span>{counts.unwatched + counts.notStarted} to go</span>
           </p>
         </div>
         <button
           onClick={onClose}
           aria-label="Close progress view"
-          className="shrink-0 rounded-lg px-2.5 py-1.5 text-slate-400 hover:bg-slate-800 hover:text-white"
+          className="progress-close"
         >
           ✕
         </button>
       </div>
 
-      {/* Legend */}
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-slate-800 px-4 py-2 text-xs text-slate-400">
-        <span><span className="text-green-400">●</span> watched</span>
-        <span><span className="text-amber-400">◐</span> skipped</span>
-        <span><span className="text-slate-400">○</span> unwatched</span>
-        <span><span className="text-slate-600">·</span> not started</span>
-        <span className="ml-auto flex gap-2">
-          <button onClick={() => setCollapsed(new Set())} className="text-slate-500 hover:text-slate-300">
-            Expand all
-          </button>
-          <button
-            onClick={() => setCollapsed(new Set(allCollapsible(roots)))}
-            className="text-slate-500 hover:text-slate-300"
-          >
-            Collapse all
-          </button>
+      <div className="progress-legend">
+        <span><span className="watched">●</span> watched</span>
+        <span><span className="skipped">◐</span> skipped</span>
+        <span><span className="unwatched">○</span> unwatched</span>
+        <span><span className="not-started">·</span> not started</span>
+        <span className="progress-legend-actions">
+          <button onClick={() => setCollapsed(new Set())}>Expand all</button>
+          <button onClick={() => setCollapsed(new Set(allCollapsible(roots)))}>Collapse all</button>
         </span>
       </div>
 
-      {/* Tree */}
-      <div className="flex-1 overflow-y-auto p-4">
-        {error && <p className="rounded-lg bg-red-950/60 px-3 py-2 text-sm text-red-300">{error}</p>}
-        {nodes.length === 0 && !error && <p className="text-sm text-slate-400">Loading…</p>}
+      <div className="progress-tree">
+        {error && <div className="progress-error">{error}</div>}
+        {nodes.length === 0 && !error && <p style={{ color: 'var(--text-muted)' }}>Loading…</p>}
         {nodes.length > 0 && (
-          <div className="space-y-0.5">
+          <div>
             {roots.map((r) => (
               <div key={r.node_id}>
                 <button
                   onClick={() => r.children.length > 0 && toggle(r.path)}
-                  className="flex w-full items-center gap-1.5 py-0.5 text-left"
+                  className="progress-tree-node"
                 >
                   {r.children.length > 0 && (
-                    <span className="w-3 shrink-0 text-xs text-slate-500">
+                    <span className="progress-tree-toggle">
                       {collapsed.has(r.path) ? '▸' : '▾'}
                     </span>
                   )}
-                  <span className="truncate text-sm font-semibold text-white">{r.topic}</span>
+                  <span className="progress-tree-label branch">{r.topic}</span>
                 </button>
                 {!collapsed.has(r.path) && renderTree(r.children, '')}
               </div>

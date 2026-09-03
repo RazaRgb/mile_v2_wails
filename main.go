@@ -29,9 +29,9 @@ func main() {
 
 	app.Window.NewWithOptions(application.WebviewWindowOptions{
 		Title: "Mile",
-		Width: 1000,
+		Width: 400,
 		// Golden ratio (1000 / 618 ≈ 1.618), roughly phone-like.
-		Height: 618,
+		Height: 919,
 		Mac: application.MacWindow{
 			InvisibleTitleBarHeight: 50,
 			Backdrop:                application.MacBackdropTranslucent,

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import AuthPage from './components/AuthPage'
-import FeedPage from './components/FeedPage'
+import TabLayout from './components/TabLayout'
 import { clearToken, getToken, setToken } from './lib/api'
 
 export default function App() {
@@ -23,5 +23,9 @@ export default function App() {
     setTokenState(null)
   }
 
-  return token ? <FeedPage onLogout={handleLogout} /> : <AuthPage onAuthenticated={handleAuthenticated} />
+  return token ? (
+    <TabLayout token={token} onLogout={handleLogout} />
+  ) : (
+    <AuthPage onAuthenticated={handleAuthenticated} />
+  )
 }
