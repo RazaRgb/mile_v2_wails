@@ -1,12 +1,12 @@
 name: Build Android APK
 on:
   push:
-    branches: [build_android]
+    branches: [main]
   workflow_dispatch:
 jobs:
   android:
     runs-on: ubuntu-latest
-    environment: build_android
+    environment: main 
     steps:
       - uses: actions/checkout@v4
       
