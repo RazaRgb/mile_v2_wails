@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, memo } from 'react'
 import NotesTab from './NotesTab'
 import QATab from './QATab'
 import CreateStreamModal from './CreateStreamModal'
@@ -12,11 +12,17 @@ interface TabLayoutProps {
   onLogout: () => void
 }
 
+// Tabs stay mounted (so their state/scroll is preserved) but are memoized so
+// switching tabs only moves the slider instead of re-rendering every page
+// (FeedPage renders heavy Markdown/KaTeX content per reel).
+const NotesTabView = memo(NotesTab)
+const QATabView = memo(QATab)
+
 const CHAT_TAB = 2
 const CHAT_PEEK_PERCENT = 20
 
 // Percent by which to translate the slider to rest on a tab.
-// When resting on Chat, keep ~10% of the Feed visible on the left edge.
+// When resting on Chat, keep ~20% of the Feed visible on the left edge.
 function tabShiftPercent(tab: number): number {
   return -(tab * 100 - (tab === CHAT_TAB ? CHAT_PEEK_PERCENT : 0))
 }
@@ -37,18 +43,30 @@ export default function TabLayout({ token, onLogout }: TabLayoutProps) {
   const touchStartY = useRef<number | null>(null)
   const dragAxis = useRef<'h' | 'v' | null>(null)
   const touching = useRef(false)
+  const rafRef = useRef<number | null>(null)
+  const pendingDelta = useRef(0)
 
   //const feedRef = useRef<{ refill: () => void } | null>(null)
   const feedRef = useRef<FeedPageRef | null>(null)
 
   function handleTouchStart(e: React.TouchEvent) {
+    const el = sliderRef.current
+    if (!el) return
     touchStartX.current = e.targetTouches[0].clientX
     touchStartY.current = e.targetTouches[0].clientY
     dragAxis.current = null
     touching.current = true
-    // Disable CSS transition while tracking the finger
+    pendingDelta.current = 0
+    if (rafRef.current !== null) cancelAnimationFrame(rafRef.current)
+    // Kill the CSS transition so the strip follows the finger 1:1
+    el.style.transition = 'none'
+  }
+
+  function paintDrag() {
+    rafRef.current = null
     const el = sliderRef.current
-    if (el) el.style.transition = 'none'
+    if (!el || !touching.current) return
+    el.style.transform = `translateX(calc(${tabShiftPercent(activeTab)}% + ${pendingDelta.current}px))`
   }
 
   function handleTouchMove(e: React.TouchEvent) {
@@ -73,7 +91,11 @@ export default function TabLayout({ token, onLogout }: TabLayoutProps) {
     if (activeTab === 0) delta = Math.min(delta, 0)
     else if (activeTab === 2) delta = Math.max(delta, 0)
 
-    el.style.transform = `translateX(calc(${tabShiftPercent(activeTab)}% + ${delta}px))`
+    pendingDelta.current = delta
+    // Write the transform at most once per frame (touch events can fire faster)
+    if (rafRef.current === null) {
+      rafRef.current = requestAnimationFrame(paintDrag)
+    }
   }
 
   function settleDrag(finalX: number | null) {
@@ -84,12 +106,25 @@ export default function TabLayout({ token, onLogout }: TabLayoutProps) {
     touchStartY.current = null
     dragAxis.current = null
     touching.current = false
-    if (el) el.style.transition = '' // Re-enable CSS transition for the snap
+    if (rafRef.current !== null) {
+      cancelAnimationFrame(rafRef.current)
+      rafRef.current = null
+    }
 
-    if (!el || startX === null || finalX === null || wasVertical) {
-      if (el) el.style.transform = `translateX(${tabShiftPercent(activeTab)}%)`
+    if (!el) return
+
+    const base = tabShiftPercent(activeTab)
+
+    if (startX === null || finalX === null || wasVertical) {
+      // Just a tap or a vertical scroll — make sure we rest on the current tab
+      el.style.transition = ''
+      el.style.transform = `translateX(${base}%)`
       return
     }
+
+    // Flush the last finger position so the snap starts exactly where we let go
+    el.style.transform = `translateX(calc(${base}% + ${pendingDelta.current}px))`
+    el.style.transition = '' // Re-enable CSS transition for the snap
 
     const swipeThreshold = 50
     const diffX = startX - finalX // > 0 => swiped left => next tab
@@ -100,7 +135,7 @@ export default function TabLayout({ token, onLogout }: TabLayoutProps) {
 
     if (target === activeTab) {
       // Snap back to the original tab with a smooth animation
-      el.style.transform = `translateX(${tabShiftPercent(activeTab)}%)`
+      el.style.transform = `translateX(${base}%)`
     } else {
       setActiveTab(target)
     }
@@ -164,11 +199,11 @@ export default function TabLayout({ token, onLogout }: TabLayoutProps) {
           ref={sliderRef}
           style={{ transform: `translateX(${tabShiftPercent(activeTab)}%)` }}
         >
-          <div className="tab-panel"><NotesTab /></div>
+          <div className="tab-panel"><NotesTabView /></div>
           <div className="tab-panel tab-panel--feed">
             <FeedPage token={token} ref={feedRef} onError={setError} />
           </div>
-          <div className="tab-panel"><QATab /></div>
+          <div className="tab-panel"><QATabView /></div>
         </div>
       </main>
 

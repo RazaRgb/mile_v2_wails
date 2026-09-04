@@ -55,6 +55,8 @@
   box-sizing: border-box;
   margin: 0;
   padding: 0;
+  /* Kill the default blue/grey “flash” the webview paints over tapped elements */
+  -webkit-tap-highlight-color: transparent;
 }
 
 html, body {
@@ -79,6 +81,16 @@ button {
   border: none;
   background: none;
   color: inherit;
+}
+
+/* Tapping a button shouldn’t leave a focus ring behind; keyboard users still
+   get a visible focus indicator via :focus-visible. */
+button:focus {
+  outline: none;
+}
+button:focus-visible {
+  outline: 2px solid var(--accent-gold);
+  outline-offset: 2px;
 }
 
 input, textarea {
@@ -218,6 +230,10 @@ input:focus, textarea:focus {
   right: 0;
   bottom: 0;
   overflow: hidden;
+  /* Vertical panning stays native (panel scrolling); horizontal gestures are
+     handled by the JS drag handler without the browser delaying touchmove
+     while it tries to disambiguate scroll intent. */
+  touch-action: pan-y;
 }
 
 .tab-slider {
@@ -502,7 +518,11 @@ input:focus, textarea:focus {
    column keeps the Q&A cards clear of that sliver and the screen edge. */
 .qa-list {
   flex: 1;
+  /* Allow the list to shrink below its content so overflow-y actually
+     scrolls instead of the accordion being pinned to the top. */
+  min-height: 0;
   overflow-y: auto;
+  overscroll-behavior: contain;
   padding-bottom: 20px;
   width: 80%;
 }
@@ -544,7 +564,7 @@ input:focus, textarea:focus {
   align-items: flex-end;
   gap: 12px;
   padding-top: 12px;
-  padding-bottom: 90px; /* Space for the bottom floating nav */
+  padding-bottom: 0px; /* Space for the bottom floating nav */
   background: var(--bg-primary); /* Prevents scroll items from showing behind it */
   width: 80%;
 }
@@ -558,9 +578,10 @@ input:focus, textarea:focus {
   align-items: center;
   justify-content: center;
   font-weight: bold;
-  font-size: 1.1rem;
+  font-size: 1.3rem;
   flex-shrink: 0;
   margin-bottom: 6px;
+  rotate: -90deg;
 }
 .qa-input-box {
   flex: 1;

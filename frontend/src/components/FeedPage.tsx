@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, forwardRef, useImperativeHandle } from 'react'
+import { memo, useEffect, useRef, useState, forwardRef, useImperativeHandle } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkMath from 'remark-math'
 import rehypeKatex from 'rehype-katex'
@@ -24,7 +24,8 @@ export interface FeedPageRef {
   refill: () => Promise<void>
 }
 
-const FeedPage = forwardRef<FeedPageRef, FeedPageProps>(({ token, onError }, ref) => {
+const FeedPage = memo(
+  forwardRef<FeedPageRef, FeedPageProps>(({ token, onError }, ref) => {
   const [reels, setReels] = useState<FeedItem[]>(() => loadReels())
   const [activeIndex, setActiveIndex] = useState(0)
 
@@ -158,6 +159,7 @@ const FeedPage = forwardRef<FeedPageRef, FeedPageProps>(({ token, onError }, ref
       ))}
     </div>
   )
-})
+  })
+)
 
 export default FeedPage

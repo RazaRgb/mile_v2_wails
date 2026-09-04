@@ -87,7 +87,6 @@ export default function QATab() {
       </div>
 
       <div className="qa-input-wrapper">
-        <div className="qa-input-icon">A</div>
         <div className="qa-input-box">
           <input
             placeholder="// Ask your doubts"
@@ -96,6 +95,7 @@ export default function QATab() {
             onKeyDown={handleKeyDown}
           />
         </div>
+        <div className="qa-input-icon">➤ </div>
       </div>
     </div>
   )
