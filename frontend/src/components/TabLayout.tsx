@@ -1,11 +1,11 @@
 import { useState, useRef } from 'react'
-import FeedPage from './FeedPage'
 import NotesTab from './NotesTab'
 import QATab from './QATab'
 import CreateStreamModal from './CreateStreamModal'
 import StreamsMenu from './StreamsMenu'
 import ProgressView from './ProgressView'
 import { api, type StreamItem } from '../lib/api'
+import FeedPage, {type FeedPageRef} from './FeedPage'
 
 interface TabLayoutProps {
   token: string
@@ -26,7 +26,8 @@ export default function TabLayout({ token, onLogout }: TabLayoutProps) {
   const touchStartX = useRef<number | null>(null)
   const touchEndX = useRef<number | null>(null)
 
-  const feedRef = useRef<{ refill: () => void } | null>(null)
+  //const feedRef = useRef<{ refill: () => void } | null>(null)
+  const feedRef = useRef<FeedPageRef | null>(null)
 
   function handleTouchStart(e: React.TouchEvent) {
     touchStartX.current = e.targetTouches[0].clientX
