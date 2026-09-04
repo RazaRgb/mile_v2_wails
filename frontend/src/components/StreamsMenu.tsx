@@ -6,10 +6,11 @@ interface StreamsMenuProps {
   open: boolean
   onClose: () => void
   token: string
+  onAddStream: () => void
   onShowProgress: (stream: StreamItem) => void
 }
 
-export default function StreamsMenu({ open, onClose, token, onShowProgress }: StreamsMenuProps) {
+export default function StreamsMenu({ open, onClose, token, onAddStream, onShowProgress }: StreamsMenuProps) {
   const [streams, setStreams] = useState<StreamItem[]>([])
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
@@ -63,13 +64,17 @@ export default function StreamsMenu({ open, onClose, token, onShowProgress }: St
         </div>
 
         <div className="drawer-body">
+          <button className="drawer-add-stream" onClick={onAddStream}>
+            + Add Stream
+          </button>
+
           {loading && <div className="stream-loading">Loading…</div>}
           
           {error && <div className="stream-error">{error}</div>}
 
           {!loading && streams.length === 0 && !error && (
             <div className="stream-empty">
-              No streams yet. Add one from the + button below.
+              No streams yet. Tap “+ Add Stream” to create one.
             </div>
           )}
 
