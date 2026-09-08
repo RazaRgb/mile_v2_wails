@@ -1,57 +1,63 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState } from 'react'
+import type { FormEvent } from 'react'
+import { api } from '../lib/api'
 
 interface CreateStreamModalProps {
   open: boolean
+  token: string
   onClose: () => void
-  onCreate: (topic: string, instructions: string, files: File[]) => Promise<void>
+  /** Called exactly once, when the backend confirms the stream was created. */
+  onCreated: () => void
 }
 
-export default function CreateStreamModal({ open, onClose, onCreate }: CreateStreamModalProps) {
+// The clarifying-questionnaire flow (backend asking cross-questions before
+// creating a stream) is not implemented yet — it's a placeholder. For now a
+// stream is created directly from its topic + optional instructions.
+function errMessage(err: unknown): string {
+  return err instanceof Error ? err.message : 'Something went wrong'
+}
+
+export default function CreateStreamModal({ open, token, onClose, onCreated }: CreateStreamModalProps) {
   const [topic, setTopic] = useState('')
   const [instructions, setInstructions] = useState('')
-  const [files, setFiles] = useState<File[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  // Reset the form every time the modal is opened.
+  useEffect(() => {
+    if (!open) return
+    setTopic('')
+    setInstructions('')
+    setLoading(false)
+    setError(null)
+  }, [open])
+
   if (!open) return null
-
-  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    if (e.target.files) {
-      setFiles((prev) => [...prev, ...Array.from(e.target.files!)])
-    }
-  }
-
-  function removeFile(index: number) {
-    setFiles((prev) => prev.filter((_, i) => i !== index))
-  }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
-    if (!topic.trim()) {
-      setError('Stream Name is required')
-      return
-    }
+    const trimmedTopic = topic.trim()
+    if (!trimmedTopic || loading) return
     setError(null)
     setLoading(true)
     try {
-      await onCreate(topic, instructions, files)
-      setTopic('')
-      setInstructions('')
-      setFiles([])
-      onClose()
+      await api.createStream(trimmedTopic, instructions.trim(), token)
+      onCreated()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create stream')
+      setError(errMessage(err))
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <div className={`modal-backdrop ${open ? 'open' : ''}`}>
+    <div className="modal-backdrop open">
       <div className="modal">
         <h2 className="modal-title">Create a New Stream</h2>
-        
-        {error && <div style={{ color: 'var(--accent-cancel)', marginBottom: '16px' }}>{error}</div>}
+
+        {error && (
+          <div style={{ color: 'var(--accent-cancel)', marginBottom: '16px' }}>{error}</div>
+        )}
 
         <form onSubmit={handleSubmit}>
           <div className="modal-field">
@@ -60,6 +66,8 @@ export default function CreateStreamModal({ open, onClose, onCreate }: CreateStr
               onChange={(e) => setTopic(e.target.value)}
               placeholder="// Stream Name"
               disabled={loading}
+              autoFocus
+              maxLength={255}
             />
           </div>
 
@@ -67,59 +75,33 @@ export default function CreateStreamModal({ open, onClose, onCreate }: CreateStr
             <textarea
               value={instructions}
               onChange={(e) => setInstructions(e.target.value)}
-              placeholder="// Instructions"
+              placeholder="// Instructions (optional) — e.g. focus on practical examples, assume I know the basics…"
+              rows={4}
               disabled={loading}
-              rows={3}
+              maxLength={2000}
             />
           </div>
 
-          <div className="modal-field">
-            <div style={{ color: 'var(--text-muted)', marginBottom: '8px', fontSize: '0.9rem' }}>// Add files</div>
-            
-            {files.length > 0 && (
-              <div style={{ marginBottom: '12px' }}>
-                {files.map((f, i) => (
-                  <div key={i} className="file-item">
-                    <span>{f.name}</span>
-                    <button 
-                      type="button" 
-                      className="file-item-remove" 
-                      onClick={() => removeFile(i)}
-                    >
-                      X
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-            
-            <label className="add-file-btn" style={{ cursor: 'pointer' }}>
-              Add a file
-              <input 
-                type="file" 
-                multiple 
-                onChange={handleFileChange} 
-                style={{ display: 'none' }}
-                disabled={loading}
-              />
-            </label>
-          </div>
+          <p className="modal-hint">
+            These instructions will steer what content is generated for this
+            stream.
+          </p>
 
           <div className="modal-actions">
-            <button 
-              type="button" 
-              className="modal-btn modal-btn--cancel" 
+            <button
+              type="button"
+              className="modal-btn modal-btn--cancel"
               onClick={onClose}
               disabled={loading}
             >
               Cancel
             </button>
-            <button 
-              type="submit" 
+            <button
+              type="submit"
               className="modal-btn modal-btn--create"
-              disabled={loading}
+              disabled={loading || !topic.trim()}
             >
-              {loading ? '...' : 'Create'}
+              {loading ? '…' : 'Create'}
             </button>
           </div>
         </form>

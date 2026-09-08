@@ -4,7 +4,7 @@ import QATab from './QATab'
 import CreateStreamModal from './CreateStreamModal'
 import StreamsMenu from './StreamsMenu'
 import ProgressView from './ProgressView'
-import { api, type StreamItem } from '../lib/api'
+import { type StreamItem } from '../lib/api'
 import FeedPage, {type FeedPageRef} from './FeedPage'
 
 interface TabLayoutProps {
@@ -150,8 +150,9 @@ export default function TabLayout({ token, onLogout }: TabLayoutProps) {
     settleDrag(null)
   }
 
-  async function handleCreateStream(topic: string, instructions: string, files: File[]) {
-    await api.createStream(topic, token)
+  async function handleCreated() {
+    // Stream finished the Q&A rounds and was created on the backend.
+    setModalOpen(false)
     if (feedRef.current) {
       feedRef.current.refill()
     }
@@ -262,8 +263,9 @@ export default function TabLayout({ token, onLogout }: TabLayoutProps) {
       
       <CreateStreamModal 
         open={modalOpen} 
+        token={token}
         onClose={() => setModalOpen(false)} 
-        onCreate={handleCreateStream} 
+        onCreated={handleCreated}
       />
 
       {progressStream && (

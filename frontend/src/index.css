@@ -303,6 +303,183 @@ input:focus, textarea:focus {
 }
 
 /* ============================================================
+   Feed — Flash cards
+   ============================================================ */
+.flash-page {
+  width: 100%;
+  max-width: 380px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.flash-card {
+  position: relative;
+  width: 100%;
+  height: 46vh;
+  max-height: 420px;
+  cursor: pointer;
+  transform-style: preserve-3d;
+  transition: transform 0.45s ease;
+  border-radius: var(--radius-lg);
+}
+
+.flash-card.flipped {
+  transform: rotateY(180deg);
+}
+
+.flash-face {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 24px;
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  overflow-y: auto;
+}
+
+.flash-back {
+  transform: rotateY(180deg);
+}
+
+.flash-label {
+  font-family: var(--font-body);
+  font-size: 0.7rem;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 16px;
+}
+
+.flash-text {
+  font-family: var(--font-body);
+  font-size: 1.1rem;
+  color: var(--text-heading);
+  line-height: 1.5;
+  word-break: break-word;
+}
+
+.card-actions {
+  display: flex;
+  gap: 12px;
+  width: 100%;
+  margin-top: 20px;
+}
+
+.card-action-btn {
+  flex: 1;
+  padding: 12px;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+  font-weight: bold;
+  border: none;
+  cursor: pointer;
+}
+
+.card-action-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.card-action-btn--good {
+  background: var(--accent-create);
+  color: var(--accent-create-text);
+}
+
+.card-action-btn--bad {
+  background: var(--accent-delete);
+  color: #fff;
+}
+
+.card-verdict {
+  margin-top: 18px;
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+  font-weight: bold;
+  text-align: center;
+}
+
+.verdict-right {
+  color: #9ecb8f;
+}
+
+.verdict-wrong {
+  color: var(--accent-cancel);
+}
+
+/* ============================================================
+   Feed — MCQ question cards
+   ============================================================ */
+.mcq-page {
+  width: 100%;
+  max-width: 380px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  background-color: var(--bg-card);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+}
+
+.mcq-page .reel-topic {
+  font-size: 1rem;
+  margin-bottom: 8px;
+}
+
+.mcq-question {
+  font-family: var(--font-body);
+  font-size: 1.05rem;
+  color: var(--text-heading);
+  line-height: 1.5;
+  margin-bottom: 18px;
+}
+
+.mcq-options {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.mcq-option {
+  text-align: left;
+  padding: 12px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-input);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  font-size: 0.92rem;
+  cursor: pointer;
+  transition: border-color var(--transition-normal);
+}
+
+.mcq-option:disabled {
+  cursor: default;
+}
+
+.mcq-option--correct {
+  border-color: #9ecb8f;
+  color: #9ecb8f;
+}
+
+.mcq-option--wrong {
+  border-color: var(--accent-cancel);
+  color: var(--accent-cancel);
+}
+
+.mcq-option--dim {
+  opacity: 0.5;
+}
+
+/* ============================================================
    Streams Drawer
    ============================================================ */
 .drawer-backdrop {
@@ -446,6 +623,26 @@ input:focus, textarea:focus {
   text-align: center;
   text-decoration: underline;
   margin-bottom: 24px;
+}
+
+.modal-hint {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin: -4px 0 16px;
+  text-align: center;
+}
+
+.modal-question-list {
+  max-height: 40vh;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.question-item-label {
+  display: block;
+  font-size: 0.9rem;
+  color: var(--text-heading);
+  margin-bottom: 6px;
 }
 
 .modal-field {
@@ -633,3 +830,155 @@ input:focus, textarea:focus {
   color: var(--accent-create-text);
   font-weight: bold;
 }
+
+/* ============================================================
+   Progress View — full-page modal
+   ============================================================ */
+.progress-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 400; /* above header (100), bottom bar (100), drawer (210), modal (300) */
+  background: var(--bg-primary);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.progress-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 18px 20px 12px;
+  border-bottom: 1px solid var(--border-subtle);
+  flex: none;
+}
+
+.progress-header-info {
+  min-width: 0;
+}
+
+.progress-title {
+  font-family: var(--font-heading);
+  font-size: 1.15rem;
+  font-weight: normal;
+  color: var(--text-heading);
+  text-transform: uppercase;
+  margin: 0 0 6px;
+  word-break: break-word;
+}
+
+.progress-stats {
+  font-family: var(--font-body);
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.progress-close {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  border: none;
+  border-radius: 50%;
+  background: var(--accent-delete);
+  color: #fff;
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+.progress-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 16px;
+  padding: 10px 20px;
+  border-bottom: 1px solid var(--border-subtle);
+  font-family: var(--font-body);
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  flex: none;
+}
+
+.progress-legend-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 10px;
+}
+
+.progress-legend-actions button {
+  background: none;
+  border: none;
+  color: var(--accent-gold);
+  font-family: var(--font-body);
+  font-size: 0.75rem;
+  cursor: pointer;
+  padding: 2px 0;
+}
+
+.progress-tree {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 12px 20px 48px;
+  font-family: var(--font-body);
+}
+
+.progress-tree-node {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  padding: 4px 0;
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.progress-tree-connector {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  white-space: pre;
+}
+
+.progress-tree-toggle {
+  flex: none;
+  width: 12px;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+}
+
+.progress-tree-label {
+  flex: 1;
+  min-width: 0;
+  word-break: break-word;
+}
+
+.progress-tree-label.branch {
+  font-weight: bold;
+  color: var(--text-heading);
+}
+
+.progress-tree-marker {
+  flex: none;
+  margin-left: 6px;
+  font-size: 0.9rem;
+}
+
+.progress-error {
+  color: var(--accent-cancel);
+  font-family: var(--font-body);
+  font-size: 0.85rem;
+  padding: 12px 0;
+}
+
+/* progress markers (scoped so they never clash with other components) */
+.progress-overlay .watched { color: #9ecb8f; }
+.progress-overlay .skipped { color: #e0b64e; }
+.progress-overlay .unwatched { color: var(--text-muted); }
+.progress-overlay .not-started { color: #6a6258; }

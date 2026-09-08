@@ -22,7 +22,25 @@ export interface FeedItem {
   topic: string
   path: string
   content: string
-  created_at: string
+  flash_cards: FlashCard[]
+  question_cards: QuestionCard[]
+}
+
+// Flash card as served by the feed. Users reveal the back (double-tap) and
+// self-grade. answered → responses history '1' (knew it) / '0' (missed).
+export interface FlashCard {
+  id: string
+  front: string
+  back: string
+}
+
+// MCQ as served by the feed. The client grades instantly against `correct`
+// (offline friendly) and reports the 1/0 result to the backend.
+export interface QuestionCard {
+  id: string
+  question: string
+  options: string[]
+  correct: string
 }
 
 export interface StreamItem {
@@ -87,10 +105,13 @@ export const api = {
 
   feed: (count: number, token: string) => request<FeedItem[]>(`/feed?count=${count}`, {}, token),
 
-  createStream: (topic: string, token: string) =>
+  // Creates a stream and seeds its roadmap. `instructions` (optional free-form
+  // text) steer the content generation. The clarifying-questionnaire flow is
+  // not implemented yet — this is the direct create call.
+  createStream: (topic: string, instructions: string, token: string) =>
     request<{ stream: unknown; nodes: unknown[] }>('/stream', {
       method: 'POST',
-      body: JSON.stringify({ topic }),
+      body: JSON.stringify({ topic, instructions }),
     }, token),
 
   listStreams: (token: string) => request<StreamItem[]>('/streams', {}, token),
@@ -105,6 +126,15 @@ export const api = {
     request<{ status: string }>(`/article/${nodeId}/status`, {
       method: 'POST',
       body: JSON.stringify({ status }),
+    }, token),
+
+  // Records one user attempt on a flash or question card. `correct` = knew it
+  // (flash) / answered right (question). Each card is answered once per
+  // viewing; the backend appends a 1/0 to the card's responses history.
+  recordCardResponse: (cardType: 'flash' | 'question', cardId: string, correct: boolean, token: string) =>
+    request<{ recorded: boolean }>('/card/response', {
+      method: 'POST',
+      body: JSON.stringify({ card_type: cardType, card_id: cardId, correct }),
     }, token),
 }
 
@@ -129,8 +159,15 @@ export function clearToken(): void {
 const REELS_CACHE_KEY = 'mile.reels.v1'
 const STATUS_CACHE_KEY = 'mile.statuses.v1'
 const PENDING_STATUS_KEY = 'mile.pendingStatus.v1'
+const PENDING_CARD_RESPONSE_KEY = 'mile.pendingCardResponse.v1'
 
 export type ReelStatus = 'watched' | 'skipped'
+
+export interface PendingCardResponse {
+  cardType: 'flash' | 'question'
+  cardId: string
+  correct: boolean
+}
 
 // saveReels persists the reel buffer (trimmed to the most recent items) so
 // previously loaded articles survive app restarts and work offline.
@@ -198,5 +235,46 @@ export function takePendingStatuses(): { nodeId: string; status: ReelStatus }[] 
     return pending
   } catch {
     return []
+  }
+}
+
+// queueCardResponse remembers a card response that failed to send (e.g.
+// offline) so it can be replayed once the network is back. A card that
+// already has a queued response is not queued twice (cards are answered once).
+export function queueCardResponse(cardType: 'flash' | 'question', cardId: string, correct: boolean): void {
+  try {
+    const pending: PendingCardResponse[] = JSON.parse(
+      localStorage.getItem(PENDING_CARD_RESPONSE_KEY) ?? '[]',
+    )
+    if (!pending.some((p) => p.cardId === cardId)) {
+      pending.push({ cardType, cardId, correct })
+      localStorage.setItem(PENDING_CARD_RESPONSE_KEY, JSON.stringify(pending))
+    }
+  } catch {
+    // ignore
+  }
+}
+
+export function takePendingCardResponses(): PendingCardResponse[] {
+  try {
+    const pending = JSON.parse(localStorage.getItem(PENDING_CARD_RESPONSE_KEY) ?? '[]')
+    localStorage.removeItem(PENDING_CARD_RESPONSE_KEY)
+    return pending
+  } catch {
+    return []
+  }
+}
+
+// clearLocalState wipes all per-account local data (cached reels, local status
+// verdicts, offline queues). Called when the user logs out or a (possibly
+// different) account authenticates, so one account's reels/statuses never leak
+// into another account's session.
+export function clearLocalState(): void {
+  for (const key of [REELS_CACHE_KEY, STATUS_CACHE_KEY, PENDING_STATUS_KEY, PENDING_CARD_RESPONSE_KEY]) {
+    try {
+      localStorage.removeItem(key)
+    } catch {
+      // ignore
+    }
   }
 }

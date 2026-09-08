@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import AuthPage from './components/AuthPage'
 import TabLayout from './components/TabLayout'
-import { clearToken, getToken, setToken } from './lib/api'
+import { clearLocalState, clearToken, getToken, setToken } from './lib/api'
 
 export default function App() {
   const [token, setTokenState] = useState<string | null>(() => getToken())
@@ -14,12 +14,16 @@ export default function App() {
   }, [])
 
   function handleAuthenticated(newToken: string) {
+    // A new (possibly different) account is now in control: drop the previous
+    // account's cached reels/statuses/pending queues first.
+    clearLocalState()
     setToken(newToken)
     setTokenState(newToken)
   }
 
   function handleLogout() {
     clearToken()
+    clearLocalState()
     setTokenState(null)
   }
 
