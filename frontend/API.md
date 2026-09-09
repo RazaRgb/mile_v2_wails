@@ -138,6 +138,44 @@ Response: `200` `{ "recorded": true }` · `404` `{ "error": "card not found" }`
 
 ---
 
+### 10. GET `/stream/{stream_id}/chat`
+Auth: bearer token
+
+Returns a stream's full chat history (oldest first):
+```json
+[
+  {
+    "id": "…",
+    "role": "user" | "assistant",
+    "content": "…",
+    "card_type": "" | "info" | "flash" | "question",
+    "card_id": "00000000-0000-0000-0000-000000000000",
+    "created_at": "…"
+  }
+]
+```
+Empty (`[]`) until the first question is asked.
+
+### 11. POST `/stream/{stream_id}/chat`
+Auth: bearer token
+
+Appends the learner's question, generates a grounded answer (card content +
+last 8 messages as context), appends the reply, and returns the updated
+history. `card_type`/`card_id` are optional soft references (no FK).
+
+Request:
+```json
+{
+  "question": "Why does buffering help here?",
+  "card_type": "flash",
+  "card_id": "…"
+}
+```
+Errors: `400` missing/invalid fields, `404` stream or card not found,
+`500` LLM/DB failure.
+
+---
+
 ## Shared types
 
 ```ts
@@ -155,12 +193,23 @@ export interface QuestionCard {
 }
 
 export interface FeedItem {
+  stream_id: string
   node_id: string
   topic: string
   path: string
   content: string
+  info_card_id: string
   flash_cards: FlashCard[]
   question_cards: QuestionCard[]
+}
+
+export interface ChatMessage {
+  id: string
+  role: 'user' | 'assistant'
+  content: string
+  card_type: '' | 'info' | 'flash' | 'question'
+  card_id: string
+  created_at: string
 }
 ```
 
@@ -176,14 +225,23 @@ export interface FeedItem {
 | `stream/{id}` (DELETE) | `StreamsMenu.tsx` → `api.deleteStream(stream.id, token)` |
 | `article/{node_id}/status` | `FeedPage.tsx` → `api.setStatus(nodeId, status, token)` (group verdict) |
 | `card/response` | `FeedPage.tsx` → `api.recordCardResponse(cardType, cardId, correct, token)` (per answered flash/question card) |
+| `stream/{id}/chat` (GET/POST) | `QATab.tsx` → `api.getChat()` / `api.askChat()` |
 
-Notes/QA tabs call no endpoints yet (placeholders).
+Notes tab is still a placeholder.
 
 ## Frontend behaviour notes
 
-- **Group verdict**: a group counts *watched* when the 10 s watch window fires
-  on its info page **or** the user answers ≥1 of its cards; otherwise it is
-  reported *skipped* when the user moves to the next group.
+- **Group verdict**: a group is reported *watched* only when **every flash card
+  and every question card in it has been answered (right or wrong)**. Groups
+  with no supplementary cards keep the old rule (10 s on the info page, or
+  skipped when moving past). Leaving an incomplete group reports nothing, so it
+  stays and is where you resume.
+- **Resume**: answered cards persist locally (`mile.cardAnswers.v1`); on reload
+  the feed opens at the first group with unanswered cards, and previously
+  answered cards are shown answered/locked.
+- **Chat scope**: the Chat tab follows the stream of the card last viewed in
+  the feed (with a manual stream dropdown). When its card is still in view,
+  new questions are tagged to that card and grounded on its content.
 - **Flash cards**: double-tap to flip; after flipping the user self-grades
   (knew it / missed it). One answer per card — the card locks afterwards.
 - **Question cards**: tapping an option grades instantly against `correct`

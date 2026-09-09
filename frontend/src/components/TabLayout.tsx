@@ -1,11 +1,11 @@
-import { useState, useRef, memo } from 'react'
+import { useCallback, useState, useRef, memo } from 'react'
 import NotesTab from './NotesTab'
 import QATab from './QATab'
 import CreateStreamModal from './CreateStreamModal'
 import StreamsMenu from './StreamsMenu'
 import ProgressView from './ProgressView'
 import { type StreamItem } from '../lib/api'
-import FeedPage, {type FeedPageRef} from './FeedPage'
+import FeedPage, { type FeedCardContext, type FeedPageRef } from './FeedPage'
 
 interface TabLayoutProps {
   token: string
@@ -36,6 +36,10 @@ export default function TabLayout({ token, onLogout }: TabLayoutProps) {
   const [modalOpen, setModalOpen] = useState(false)
   const [progressStream, setProgressStream] = useState<StreamItem | null>(null)
   const [error, setError] = useState<string | null>(null)
+  // The card currently on screen in the feed — drives which stream/card the
+  // chat tab is scoped to.
+  const [chatCtx, setChatCtx] = useState<FeedCardContext | null>(null)
+  const handleActiveCard = useCallback((ctx: FeedCardContext) => setChatCtx(ctx), [])
   
   // Swipe detection / drag-follow
   const sliderRef = useRef<HTMLDivElement | null>(null)
@@ -202,9 +206,9 @@ export default function TabLayout({ token, onLogout }: TabLayoutProps) {
         >
           <div className="tab-panel"><NotesTabView /></div>
           <div className="tab-panel tab-panel--feed">
-            <FeedPage token={token} ref={feedRef} onError={setError} />
+            <FeedPage token={token} ref={feedRef} onError={setError} onActiveCard={handleActiveCard} />
           </div>
-          <div className="tab-panel"><QATabView /></div>
+          <div className="tab-panel"><QATabView token={token} context={chatCtx} /></div>
         </div>
       </main>
 

@@ -18,10 +18,12 @@ export interface AuthResponse {
 }
 
 export interface FeedItem {
+  stream_id: string
   node_id: string
   topic: string
   path: string
   content: string
+  info_card_id: string
   flash_cards: FlashCard[]
   question_cards: QuestionCard[]
 }
@@ -48,6 +50,23 @@ export interface StreamItem {
   user_id: string
   topic: string
   feedback: string
+  created_at: string
+}
+
+// --- stream chat ----------------------------------------------------------
+
+export type ChatRole = 'user' | 'assistant'
+export type ChatCardType = '' | 'info' | 'flash' | 'question'
+
+// UUID used by the backend when a chat message has no card reference.
+export const NIL_UUID = '00000000-0000-0000-0000-000000000000'
+
+export interface ChatMessage {
+  id: string
+  role: ChatRole
+  content: string
+  card_type: ChatCardType
+  card_id: string
   created_at: string
 }
 
@@ -116,6 +135,25 @@ export const api = {
 
   listStreams: (token: string) => request<StreamItem[]>('/streams', {}, token),
 
+  getChat: (streamId: string, token: string) =>
+    request<ChatMessage[]>(`/stream/${streamId}/chat`, {}, token),
+
+  // Appends the learner's question (optionally tagged to a card) and returns
+  // the updated history once the assistant reply is generated.
+  askChat: (
+    streamId: string,
+    question: string,
+    token: string,
+    card?: { cardType: Exclude<ChatCardType, ''>; cardId: string },
+  ) =>
+    request<ChatMessage[]>(`/stream/${streamId}/chat`, {
+      method: 'POST',
+      body: JSON.stringify({
+        question,
+        ...(card ? { card_type: card.cardType, card_id: card.cardId } : {}),
+      }),
+    }, token),
+
   streamTree: (streamId: string, token: string) =>
     request<TreeNode[]>(`/stream/${streamId}/tree`, {}, token),
 
@@ -160,8 +198,37 @@ const REELS_CACHE_KEY = 'mile.reels.v1'
 const STATUS_CACHE_KEY = 'mile.statuses.v1'
 const PENDING_STATUS_KEY = 'mile.pendingStatus.v1'
 const PENDING_CARD_RESPONSE_KEY = 'mile.pendingCardResponse.v1'
+const CARD_ANSWER_KEY = 'mile.cardAnswers.v1'
 
 export type ReelStatus = 'watched' | 'skipped'
+
+// --- answered-card persistence (resume support) ---------------------------
+
+// What the user answered on a flash or question card, stored locally so a
+// partially finished group can be resumed with answered cards still locked.
+export interface StoredCardAnswer {
+  kind: 'flash' | 'question'
+  correct?: boolean // flash: knew it?
+  selected?: string // question: option picked
+}
+
+export function loadStoredCardAnswers(): Record<string, StoredCardAnswer> {
+  try {
+    return JSON.parse(localStorage.getItem(CARD_ANSWER_KEY) ?? '{}')
+  } catch {
+    return {}
+  }
+}
+
+export function storeCardAnswer(cardId: string, answer: StoredCardAnswer): void {
+  try {
+    const all = loadStoredCardAnswers()
+    all[cardId] = answer
+    localStorage.setItem(CARD_ANSWER_KEY, JSON.stringify(all))
+  } catch {
+    // ignore
+  }
+}
 
 export interface PendingCardResponse {
   cardType: 'flash' | 'question'
@@ -270,7 +337,7 @@ export function takePendingCardResponses(): PendingCardResponse[] {
 // different) account authenticates, so one account's reels/statuses never leak
 // into another account's session.
 export function clearLocalState(): void {
-  for (const key of [REELS_CACHE_KEY, STATUS_CACHE_KEY, PENDING_STATUS_KEY, PENDING_CARD_RESPONSE_KEY]) {
+  for (const key of [REELS_CACHE_KEY, STATUS_CACHE_KEY, PENDING_STATUS_KEY, PENDING_CARD_RESPONSE_KEY, CARD_ANSWER_KEY]) {
     try {
       localStorage.removeItem(key)
     } catch {

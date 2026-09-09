@@ -982,3 +982,107 @@ input:focus, textarea:focus {
 .progress-overlay .skipped { color: #e0b64e; }
 .progress-overlay .unwatched { color: var(--text-muted); }
 .progress-overlay .not-started { color: #6a6258; }
+
+/* ============================================================
+   Chat tab (per-stream Q&A)
+   ============================================================ */
+.chat-topbar {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 80%;
+  margin-bottom: 12px;
+}
+
+.chat-select {
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-input);
+  background: var(--bg-card);
+  color: var(--text-heading);
+  font-family: var(--font-body);
+  font-size: 0.85rem;
+}
+
+.chat-context-chip {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  color: var(--accent-gold);
+  border-radius: 999px;
+  padding: 5px 12px;
+  font-family: var(--font-body);
+  font-size: 0.72rem;
+  cursor: pointer;
+}
+
+.chat-context-clear {
+  color: var(--text-muted);
+  margin-left: 4px;
+}
+
+.chat-error {
+  color: var(--accent-cancel);
+  font-family: var(--font-body);
+  font-size: 0.8rem;
+  padding: 8px 0;
+}
+
+.chat-empty {
+  color: var(--text-muted);
+  font-family: var(--font-body);
+  font-size: 0.85rem;
+  padding: 8px 0;
+}
+
+.qa-item-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
+  padding: 14px 16px;
+  background: none;
+  border: none;
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  font-size: 0.92rem;
+  cursor: pointer;
+}
+
+.qa-question-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.qa-chip {
+  flex: none;
+  font-size: 0.62rem;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--accent-gold);
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  padding: 2px 8px;
+}
+
+.qa-send {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: none;
+  background: var(--accent-create);
+  color: var(--accent-create-text);
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+.qa-send:disabled {
+  opacity: 0.4;
+  cursor: default;
+}

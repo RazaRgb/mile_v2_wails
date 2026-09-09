@@ -6,10 +6,12 @@ import 'katex/dist/katex.min.css'
 import {
   api,
   loadReels,
+  loadStoredCardAnswers,
   queueCardResponse,
   queueStatus,
   recordStatus,
   saveReels,
+  storeCardAnswer,
   takePendingCardResponses,
   takePendingStatuses,
 } from '../lib/api'
@@ -29,10 +31,21 @@ function normalizeLatex(md: string): string {
 interface FeedPageProps {
   token: string
   onError: (err: string | null) => void
+  /** Reports the card/group currently on screen so the chat tab can follow it. */
+  onActiveCard?: (ctx: FeedCardContext) => void
 }
 
 export interface FeedPageRef {
   refill: () => Promise<void>
+}
+
+// Context of the card currently being viewed — used to scope chat questions.
+export interface FeedCardContext {
+  streamId: string
+  nodeId: string
+  topic: string
+  cardType: 'info' | 'flash' | 'question'
+  cardId?: string
 }
 
 type PageKind = 'info' | 'flash' | 'question'
@@ -86,15 +99,48 @@ function groupIndexOfPage(reels: FeedItem[], pageIdx: number): number {
   return -1
 }
 
+// hasSupplementalCards reports whether a group carries flash/quiz cards (and is
+// therefore "finished only when all of them are answered").
+function hasSupplementalCards(reel: FeedItem): boolean {
+  return (reel.flash_cards?.length ?? 0) + (reel.question_cards?.length ?? 0) > 0
+}
+
+// isGroupComplete reports whether every flash and question card in the group
+// has been answered (right or wrong).
+function isGroupComplete(
+  reel: FeedItem,
+  flashAnswered: Record<string, boolean>,
+  questionAnswered: Record<string, string>,
+): boolean {
+  const flashesAll = (reel.flash_cards ?? []).every((f) => flashAnswered[f.id] !== undefined)
+  const questionsAll = (reel.question_cards ?? []).every((q) => questionAnswered[q.id] !== undefined)
+  return flashesAll && questionsAll
+}
+
 const FeedPage = memo(
-  forwardRef<FeedPageRef, FeedPageProps>(({ token, onError }, ref) => {
+  forwardRef<FeedPageRef, FeedPageProps>(({ token, onError, onActiveCard }, ref) => {
   const [reels, setReels] = useState<FeedItem[]>(() => loadReels())
   const [activeIndex, setActiveIndex] = useState(0)
   const [flipped, setFlipped] = useState<Record<string, boolean>>({})
-  // flash card id -> whether the user knew it
-  const [flashAnswered, setFlashAnswered] = useState<Record<string, boolean>>({})
-  // question card id -> the option the user picked
-  const [questionAnswered, setQuestionAnswered] = useState<Record<string, string>>({})
+
+  // Hydrated from the persistent answer store so a resumed group re-opens with
+  // previously answered cards locked as answered.
+  const [flashAnswered, setFlashAnswered] = useState<Record<string, boolean>>(() => {
+    const all = loadStoredCardAnswers()
+    const out: Record<string, boolean> = {}
+    for (const [id, a] of Object.entries(all)) {
+      if (a.kind === 'flash' && a.correct !== undefined) out[id] = a.correct
+    }
+    return out
+  })
+  const [questionAnswered, setQuestionAnswered] = useState<Record<string, string>>(() => {
+    const all = loadStoredCardAnswers()
+    const out: Record<string, string> = {}
+    for (const [id, a] of Object.entries(all)) {
+      if (a.kind === 'question' && a.selected !== undefined) out[id] = a.selected
+    }
+    return out
+  })
 
   const reelsRef = useRef(reels)
   reelsRef.current = reels
@@ -106,11 +152,13 @@ const FeedPage = memo(
   const emptyStreakRef = useRef(0)
   // node_ids whose final watched/skipped verdict has been reported already
   const reportedRef = useRef<Set<string>>(new Set())
-  // node_ids marked watched (timer fired or a card was answered)
+  // node_ids that reached "watched" (group complete, or timer fired on a group
+  // without supplementary cards)
   const watchedRef = useRef<Set<string>>(new Set())
   const activeGroupRef = useRef<number>(-1)
   const timerRef = useRef<number | null>(null)
   const lastTapRef = useRef<Record<string, number>>({})
+  const activeCardKeyRef = useRef<string>('')
 
   const pages = useMemo(() => buildPages(reels), [reels])
 
@@ -135,8 +183,6 @@ const FeedPage = memo(
     api.setStatus(nodeId, status, token).catch(() => queueStatus(nodeId, status))
   }
 
-  // A group counts as watched once the user spent the watch window on its info
-  // page or answered at least one of its cards.
   function markGroupWatched(nodeId: string) {
     watchedRef.current.add(nodeId)
     if (!reportedRef.current.has(nodeId)) {
@@ -153,6 +199,23 @@ const FeedPage = memo(
     api.recordCardResponse(cardType, cardId, correct, token).catch(() => {
       queueCardResponse(cardType, cardId, correct)
     })
+  }
+
+  // Called after every answer; watches the group once ALL of its flash and
+  // question cards are answered.
+  function considerGroupWatched(
+    nodeId: string,
+    flashMap: Record<string, boolean>,
+    questionMap: Record<string, string>,
+  ) {
+    if (watchedRef.current.has(nodeId) || reportedRef.current.has(nodeId)) return
+    const reel = reelsRef.current.find((r) => r.node_id === nodeId)
+    if (!reel) return
+    // A group with no supplementary cards is not governed by answers.
+    if (!hasSupplementalCards(reel)) return
+    if (isGroupComplete(reel, flashMap, questionMap)) {
+      markGroupWatched(nodeId)
+    }
   }
 
   async function flushPending() {
@@ -236,35 +299,46 @@ const FeedPage = memo(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeIndex, reels.length])
 
-  // Finalize the verdict of the group we just left, and mark a watched timer
-  // while the user rests on a group's info page.
+  // Finalize the verdict of the group we just left and watch it while resting
+  // on its info page.
   useEffect(() => {
     if (pages.length === 0) return
 
     const group = groupIndexOfPage(reels, activeIndex)
     const prev = activeGroupRef.current
     if (prev >= 0 && prev !== group) {
-      const nodeId = reels[prev]?.node_id
-      if (nodeId && !reportedRef.current.has(nodeId)) {
-        // Left the group without the watch window or any answer: skipped.
-        reportNodeStatus(nodeId, 'skipped')
+      const reel = reels[prev]
+      if (reel && !reportedRef.current.has(reel.node_id)) {
+        if (hasSupplementalCards(reel)) {
+          // Groups with flash/quiz cards are only "watched" when fully
+          // answered. Leaving early does NOT report anything — the group stays
+          // so the user can resume and finish it.
+        } else if (!watchedRef.current.has(reel.node_id)) {
+          reportNodeStatus(reel.node_id, 'skipped')
+        }
       }
     }
     activeGroupRef.current = group
 
     if (group < 0) return
     const page = pages[activeIndex]
-    const nodeId = reels[group]?.node_id
-    if (!nodeId) return
+    const reel = reels[group]
+    if (!reel) return
 
     if (timerRef.current !== null) {
       window.clearTimeout(timerRef.current)
       timerRef.current = null
     }
-    // The watch timer only runs while resting on the group's info page.
-    if (page?.kind === 'info' && !watchedRef.current.has(nodeId) && !reportedRef.current.has(nodeId)) {
+    // The 10s watch timer only applies to groups WITHOUT flash/quiz cards
+    // (groups with cards are watched by completing them).
+    if (
+      page?.kind === 'info' &&
+      !hasSupplementalCards(reel) &&
+      !watchedRef.current.has(reel.node_id) &&
+      !reportedRef.current.has(reel.node_id)
+    ) {
       timerRef.current = window.setTimeout(() => {
-        markGroupWatched(nodeId)
+        markGroupWatched(reel.node_id)
       }, WATCH_MS)
     }
     return () => {
@@ -289,6 +363,29 @@ const FeedPage = memo(
     return () => panel.removeEventListener('scroll', onScroll)
   }, [])
 
+  // Tell the chat tab what card is on screen (stream-scoped context).
+  useEffect(() => {
+    const page = pages[activeIndex]
+    if (!page) return
+    const reel = reels.find((r) => r.node_id === page.nodeId)
+    if (!reel) return
+
+    let cardId: string | undefined
+    let cardType: FeedCardContext['cardType'] = 'info'
+    if (page.kind === 'flash') cardType = 'flash'
+    else if (page.kind === 'question') cardType = 'question'
+
+    if (cardType === 'info') cardId = reel.info_card_id || undefined
+    else if (cardType === 'flash') cardId = page.flash?.id
+    else cardId = page.question?.id
+
+    const key = `${reel.stream_id}|${cardType}|${cardId ?? ''}`
+    if (key === activeCardKeyRef.current) return
+    activeCardKeyRef.current = key
+
+    onActiveCard?.({ streamId: reel.stream_id, nodeId: reel.node_id, topic: reel.topic, cardType, cardId })
+  }, [activeIndex, pages, reels, onActiveCard])
+
   // --- card interactions ----------------------------------------------------
 
   function handleFlashTap(cardId: string) {
@@ -304,16 +401,20 @@ const FeedPage = memo(
 
   function answerFlash(nodeId: string, card: FlashCard, knewIt: boolean) {
     if (flashAnswered[card.id] !== undefined) return
-    setFlashAnswered((prev) => ({ ...prev, [card.id]: knewIt }))
-    markGroupWatched(nodeId)
+    storeCardAnswer(card.id, { kind: 'flash', correct: knewIt })
+    const next = { ...flashAnswered, [card.id]: knewIt }
+    setFlashAnswered(next)
     sendCardResponse('flash', card.id, knewIt)
+    considerGroupWatched(nodeId, next, questionAnswered)
   }
 
   function answerQuestion(nodeId: string, card: QuestionCard, selected: string) {
     if (questionAnswered[card.id] !== undefined) return
-    setQuestionAnswered((prev) => ({ ...prev, [card.id]: selected }))
-    markGroupWatched(nodeId)
+    storeCardAnswer(card.id, { kind: 'question', selected })
+    const next = { ...questionAnswered, [card.id]: selected }
+    setQuestionAnswered(next)
     sendCardResponse('question', card.id, selected === card.correct)
+    considerGroupWatched(nodeId, flashAnswered, next)
   }
 
   function renderInfoPage(page: Page) {
