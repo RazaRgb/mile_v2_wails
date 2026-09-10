@@ -35,6 +35,7 @@ tasks:
     summary: Creates a debug build of the application for Android
     deps:
       - task: common:go:mod:tidy
+      - task: generate:android:icons
       - task: generate:android:overlay
       - task: common:build:frontend
         vars:
@@ -51,6 +52,27 @@ tasks:
       BUILD_FLAGS: '{{if eq .PRODUCTION "true"}}-tags production,android -trimpath -buildvcs=false -ldflags="-w -s"{{else}}-tags android,debug -buildvcs=false -gcflags=all="-l"{{end}}'
     env:
       PRODUCTION: '{{.PRODUCTION | default "false"}}'
+
+  generate:android:icons:
+    internal: true
+    summary: Generates Android launcher mipmaps from build/appicon.png
+    # Wails' `generate icons` only emits Windows/macOS assets, so Android's
+    # mipmaps are produced here to keep the launcher icon in sync with appicon.png.
+    sources:
+      - build/appicon.png
+    generates:
+      - build/android/app/src/main/res/mipmap-mdpi/ic_launcher.png
+      - build/android/app/src/main/res/mipmap-hdpi/ic_launcher.png
+      - build/android/app/src/main/res/mipmap-xhdpi/ic_launcher.png
+      - build/android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png
+      - build/android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
+      - build/android/app/src/main/res/mipmap-mdpi/ic_launcher_round.png
+      - build/android/app/src/main/res/mipmap-hdpi/ic_launcher_round.png
+      - build/android/app/src/main/res/mipmap-xhdpi/ic_launcher_round.png
+      - build/android/app/src/main/res/mipmap-xxhdpi/ic_launcher_round.png
+      - build/android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_round.png
+    cmds:
+      - go run ./build/android/scripts/icons -input build/appicon.png -out build/android/app/src/main/res
 
   compile:go:shared:
     summary: Compile Go code to shared library (.so)
