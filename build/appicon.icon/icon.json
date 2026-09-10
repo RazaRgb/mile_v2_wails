@@ -16,11 +16,11 @@
             {
               "appearance" : "tinted",
               "value" : {
-                "solid" : "srgb:0.83742,0.83744,0.83743,1.00000"
+                "solid" : "srgb:0.80784,0.80392,0.67059,1.00000"
               }
             }
           ],
-          "image-name" : "wails_icon_vector.svg",
+          "image-name" : "app_icon_vector.svg",
           "name" : "wails_icon_vector",
           "position" : {
             "scale" : 1.5,
